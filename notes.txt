@@ -1,0 +1,2 @@
+add that you can trigger a review by mentioning @pr-agent when you open a pull request 
+

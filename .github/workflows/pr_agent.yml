@@ -1,18 +1,50 @@
 on:
-    pull_request:
-    issue_comment:
-  jobs:
-    pr_agent_job:
-      runs-on: ubuntu-latest
-      permissions:
-        issues: write
-        pull-requests: write
-        contents: write
-      name: Run pr agent on every pull request, respond to user comments
-      steps:
-        - name: PR Agent action step
-          id: pragent
-          uses: Codium-ai/pr-agent@main
-          env:
-            OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  pr_agent_job:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    name: Run pr agent on pull request actions
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Find comments containing "@pr-agent"
+        run: |
+          comments=$(gh issue comment list --issue-number ${{ github.event.pull_request.number }})
+          if [[ $comments == *"@pr-agent"* ]]; then
+            echo "::set-output name=has_pr_agent_mention::true"
+          fi
+
+      - name: Run pr agent (if comment mentions @pr-agent)
+        id: pragent
+        uses: Codium-ai/pr-agent@main
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: steps.find-comments-containing-pr-agent.outputs.has_pr_agent_mention == 'true'
+
+      - name: Apply label based on sentiment
+        uses: google/github-actions/label@v3
+        with:
+          labels: |
+            Bug
+            Feature
+            Documentation
+            Refactor
+            Testing
+            Performance
+            "On Hold"
+            "Merge Conflict"
+            "Work in Progress (WIP)"
+            "Needs Discussion"
+            "Good First Issue"
+            Duplicate
+          # Add label based on PR Agent sentiment analysis (replace with your logic)
+          # You can customize the labels based on sentiment analysis or any other condition
+        if: steps.pragent.outputs.sentiment == 'negative'  # Replace with your sentiment check
